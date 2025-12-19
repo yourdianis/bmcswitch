@@ -1,13 +1,14 @@
 # IPMITool 服务器管理工具
 
-基于Go和Gin框架的IPMI服务器电源管理工具，支持通过带内IP进行服务器的开机和关机操作。
+基于Go和Gin框架的IPMI服务器电源管理工具，支持通过带内IP进行服务器的电源管理操作。
 
 ## 功能特性
 
 - 通过带内IP查找对应的带外IP（BMC IP）
-- 支持服务器开机（on）和关机（off）操作
+- 支持服务器**开机（on）**、**关机（off）**和**查询电源状态（status）**操作
 - 配置文件管理IP映射关系
-- RESTful API接口
+- RESTful API接口（POST请求）
+- 支持Docker容器化部署
 
 ## 配置文件格式
 
@@ -44,19 +45,70 @@
 192.168.1.101 | 192.168.1.201 | admin | password456
 ```
 
-## 安装依赖
+## 部署方式
 
+### 方式一：Docker 部署（推荐）
+
+#### 使用 docker-compose（最简单）
+
+```bash
+# 启动服务
+docker-compose up -d
+
+# 查看日志
+docker-compose logs -f
+
+# 停止服务
+docker-compose down
+```
+
+#### 使用 docker 命令
+
+1. **构建镜像**：
+```bash
+docker build -t ipmitool:latest .
+```
+
+2. **运行容器**（使用主机网络模式，确保可以访问BMC IP）：
+```bash
+docker run -d \
+  --name ipmitool \
+  --network host \
+  -v $(pwd)/config.txt:/app/config.txt \
+  ipmitool:latest
+```
+
+3. **使用环境变量自定义端口**：
+```bash
+docker run -d \
+  --name ipmitool \
+  -p 8081:8081 \
+  -e PORT=8081 \
+  --network host \
+  -v $(pwd)/config.txt:/app/config.txt \
+  ipmitool:latest
+```
+
+> **注意**：使用 `--network host` 模式可以让容器直接访问主机网络，方便访问 BMC IP 地址。
+
+### 方式二：本地运行
+
+1. **安装依赖**：
 ```bash
 go mod download
 ```
 
-## 运行服务
+2. **安装 ipmitool**：
+   - Linux: `sudo apt-get install ipmitool` 或 `sudo yum install ipmitool`
+   - macOS: `brew install ipmitool`
+   - Windows: 下载安装包或使用包管理器
 
+3. **运行服务**：
 ```bash
 go run main.go
 ```
 
-服务将在 `http://localhost:8080` 启动。
+服务默认在 `http://localhost:8080` 启动，可通过环境变量 `PORT` 自定义端口。
 
 ## API接口
 
@@ -75,9 +127,15 @@ go run main.go
 - **示例**:
 
 ```bash
-curl -X POST "http://localhost:8081/on" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"ip\":\"10.222.5.41\"}"
+# Linux/macOS
+curl -X POST "http://localhost:8080/on" \
+  -H "Content-Type: application/json" \
+  -d '{"ip":"10.222.5.41"}'
+
+# Windows PowerShell
+curl -X POST "http://localhost:8080/on" `
+  -H "Content-Type: application/json" `
+  -d '{\"ip\":\"10.222.5.41\"}'
 ```
 
 - **成功响应**:
@@ -105,9 +163,15 @@ curl -X POST "http://localhost:8081/on" ^
 - **示例**:
 
 ```bash
-curl -X POST "http://localhost:8081/off" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"ip\":\"10.222.5.41\"}"
+# Linux/macOS
+curl -X POST "http://localhost:8080/off" \
+  -H "Content-Type: application/json" \
+  -d '{"ip":"10.222.5.41"}'
+
+# Windows PowerShell
+curl -X POST "http://localhost:8080/off" `
+  -H "Content-Type: application/json" `
+  -d '{\"ip\":\"10.222.5.41\"}'
 ```
 
 - **成功响应**:
@@ -135,9 +199,15 @@ curl -X POST "http://localhost:8081/off" ^
 - **示例**:
 
 ```bash
-curl -X POST "http://localhost:8081/status" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"ip\":\"10.222.5.41\"}"
+# Linux/macOS
+curl -X POST "http://localhost:8080/status" \
+  -H "Content-Type: application/json" \
+  -d '{"ip":"10.222.5.41"}'
+
+# Windows PowerShell
+curl -X POST "http://localhost:8080/status" `
+  -H "Content-Type: application/json" `
+  -d '{\"ip\":\"10.222.5.41\"}'
 ```
 
 - **成功响应**（示例）:
@@ -169,9 +239,19 @@ curl -X POST "http://localhost:8081/status" ^
 }
 ```
 
+## 接口说明
+
+### 三个核心接口
+
+1. **`POST /on`** - 开机接口
+2. **`POST /off`** - 关机接口  
+3. **`POST /status`** - 查询电源状态接口
+
+所有接口都使用 POST 请求，请求体为 JSON 格式：`{"ip": "带内IP"}`
+
 ## 前置要求
 
-- 系统需要安装 `ipmitool` 工具
+- 系统需要安装 `ipmitool` 工具（Docker 镜像已包含）
 - 确保网络可以访问BMC IP地址
 - 确保BMC用户名和密码正确
 
@@ -179,6 +259,7 @@ curl -X POST "http://localhost:8081/status" ^
 
 1. 请妥善保管 `config.txt` 文件，避免泄露BMC密码
 2. 建议在生产环境中使用环境变量或加密存储密码
-3. 确保ipmitool工具已正确安装并配置
+3. 使用 Docker 部署时，确保容器网络可以访问 BMC IP 地址
 4. 配置文件格式简单，方便批量导入和查找
+5. 所有接口都使用 POST 请求，请求体必须包含 `ip` 字段
 

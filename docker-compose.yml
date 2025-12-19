@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  ipmitool:
+    build: .
+    container_name: ipmitool
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+    volumes:
+      - ./config.txt:/app/config.txt:ro
+    restart: unless-stopped
+    network_mode: host  # 使用主机网络模式，确保可以访问BMC IP
+

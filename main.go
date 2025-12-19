@@ -266,9 +266,15 @@ func main() {
 	r.POST("/off", powerOffHandler)
 	r.POST("/status", powerStatusHandler)
 
+	// 获取端口，默认8080
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
 	// 启动服务器
-	fmt.Println("IPMITool服务启动在 :8081")
-	if err := r.Run(":8081"); err != nil {
+	fmt.Printf("IPMITool服务启动在 :%s\n", port)
+	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("启动服务器失败: %v", err)
 	}
 }
